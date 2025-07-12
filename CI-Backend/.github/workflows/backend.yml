@@ -1,0 +1,35 @@
+name: Backend CI/CD
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Build backend Docker image
+        run: |
+          docker build -t sagar592/backend-api:latest ./backend
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Push backend Docker image
+        run: docker push sagar592/backend-api:latest
+
+      - name: Deploy to backend EC2 server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.BACKEND_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker pull sagar592/backend-api:latest
+            docker stop backend-api || true
+            docker rm backend-api || true
+            docker run -d -p 8000:8000 --name backend-api sagar592/backend-api:latest
